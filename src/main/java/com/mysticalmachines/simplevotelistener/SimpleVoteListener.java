@@ -2,9 +2,11 @@ package com.mysticalmachines.simplevotelistener;
 
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
+import com.mysticalmachines.simplevotelistener.configuration.ConfigManager;
+import com.mysticalmachines.simplevotelistener.configuration.PluginConfiguration;
+import com.mysticalmachines.simplevotelistener.storage.Storage;
 import com.vexsoftware.votifier.model.Vote;
 import com.vexsoftware.votifier.sponge.event.VotifierEvent;
-import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
 import org.slf4j.Logger;
@@ -19,14 +21,15 @@ import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.plugin.PluginContainer;
 
-import java.io.File;
-import java.io.IOException;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Plugin(
         id = "simplevotelistener",
-        name = "Simplevotelistener",
+        name = "SimpleVoteListener",
         description = "Simple Vote Listener for Sponge",
         url = "https://mysticalmachines.com",
         authors = {
@@ -36,32 +39,33 @@ import java.util.Optional;
                 @Dependency(id = "nuvotifier")
         }
 )
-public class Simplevotelistener {
+public class SimpleVoteListener {
 
-    public List<String> executeCommandsOnVote;
-    private ConfigurationNode config;
-    @Inject
-    @ConfigDir(sharedRoot = false)
-    private File configDir;
     @Inject
     @DefaultConfig(sharedRoot = false)
-    private File defaultConf;
+    private Path defaultPath;
+
     @Inject
     @DefaultConfig(sharedRoot = false)
     private ConfigurationLoader<CommentedConfigurationNode> loader;
+
     @Inject
     private PluginContainer pluginContainer;
+
     @Inject
     private Logger logger;
 
+    private static SimpleVoteListener instance;
+    private ConfigManager configManager;
+    private Storage storage;
+    private Map<String, String> rewards;
+
     @Listener
     public void preInit(GamePreInitializationEvent event) {
-        try {
-            loadConfig();
-            this.executeCommandsOnVote = config.getNode("commands").getList(TypeToken.of(String.class));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        instance = this;
+        configManager = new ConfigManager(defaultPath, loader);
+        storage = new Storage();
+        rewards = PluginConfiguration.RewardCommands.REWARDS;
     }
 
     @Listener
@@ -74,32 +78,34 @@ public class Simplevotelistener {
         Vote vote = event.getVote();
         Optional<Player> optPlayer = Sponge.getServer().getPlayer(vote.getUsername());
         if (optPlayer.isPresent()) {
-            this.executeConfiguredCommands(optPlayer.get());
+            // test
         } else {
             this.logger.info("Player: " + vote.getUsername() + " was not online, or something went wrong!");
         }
     }
-    /**
-     * Load the default config file, simplevotelistener.conf.
-     */
-    private void loadConfig() {
-        try {
-            if (!defaultConf.exists()) {
-                pluginContainer.getAsset("simplevotelistener.conf").get().copyToFile(defaultConf.toPath());
-            }
 
-            this.config = loader.load();
-        } catch (IOException e) {
-            logger.warn("[Simple Vote Listener] Main configuration file could not be loaded/created/changed!");
-        }
-    }
-
-    private void executeConfiguredCommands(Player player) {
+    /*private void executeConfiguredCommands(Player player) {
         for (String command :
                 this.executeCommandsOnVote) {
             Sponge.getCommandManager().process(Sponge.getServer().getConsole(), command
                     .replace("%player%", player.getName())
                     .replace("%playeruuid%", player.getUniqueId().toString()));
         }
+    }*/
+
+    public static SimpleVoteListener getInstance() {
+        return instance;
+    }
+
+    public Logger getLogger() {
+        return logger;
+    }
+
+    public Path getDefaultPath() {
+        return defaultPath;
+    }
+
+    public PluginContainer getPluginContainer() {
+        return  pluginContainer;
     }
 }
